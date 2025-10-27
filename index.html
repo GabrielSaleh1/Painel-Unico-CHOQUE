@@ -32,8 +32,10 @@
       ponto: "https://gabrielsaleh1.github.io/Ponto-Online",
       rso: "https://gabrielsaleh1.github.io/RSO-Online",
 
-      // Documentos do Batalhão (agora Hierarquia em modo leitura)
+      // Hierarquia travada em leitura (parâmetro + sandbox)
       hierarquia: "https://gabrielsaleh1.github.io/Hierarquia?view=1",
+
+      // Documentos do Batalhão
       fardamentos: "docs.google.com/spreadsheets/u/1/d/15q-JK8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/edit?usp=sharing",
       doutrinas: "https://docs.google.com/document/d/1LwrV0gPkA0QCRinGGXtQF0bsaWri-rQZOdPiVmCPVus/edit?usp=sharing",
       secoes: "https://docs.google.com/spreadsheets/d/1Rw6o7O1rAjVC4XCDFwe6L0vInKSQsBvYZsWm6Rb1pfE/edit?gid=0#gid=0",
@@ -43,51 +45,43 @@
     // Converte links do Google Docs/Sheets para /preview (melhor para iframe)
     function toEmbedUrl(url) {
       if (!url) return url;
-      // adiciona https:// se faltou
       if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-
       try {
         const u = new URL(url);
-        // somente para docs.google.com
         if (u.hostname !== "docs.google.com") return url;
-
-        // document ou spreadsheets
-        const parts = u.pathname.split("/").filter(Boolean); // ["document","d","<ID>", ...]
+        const parts = u.pathname.split("/").filter(Boolean);
         const type = parts[0]; // "document" | "spreadsheets" | ...
         const idIndex = parts.findIndex(p => p === "d");
         const fileId = idIndex >= 0 ? parts[idIndex + 1] : null;
-
         if (fileId) {
-          // mantém fragmento (#gid=0) se houver
           const frag = u.hash || "";
           return `https://docs.google.com/${type}/d/${fileId}/preview${frag}`;
         }
-      } catch(e) {
-        // se der erro, retorna original
-      }
+      } catch(e) {}
       return url;
     }
 
+    // Itens da interface
     const CONFIG = {
       brand: { name: "ROTA · Painel Único", badge: "GTA RP" },
-
-      // Itens da sidebar em duas seções
       sections: [
         {
           label: "Sistemas",
           items: [
-            { id: "ponto", name: "Bate-Ponto", url: RAW_LINKS.ponto, icon: "⏱️" },
-            { id: "rso", name: "RSO Online", url: RAW_LINKS.rso, icon: "📋" },
+            { id: "ponto", name: "Bate-Ponto", url: RAW_LINKS.ponto, icon: "⏱️", sandbox: null },
+            { id: "rso", name: "RSO Online", url: RAW_LINKS.rso, icon: "📋", sandbox: null },
           ],
         },
         {
           label: "Documentos do Batalhão",
           items: [
-            { id: "hierarquia", name: "Hierarquia do Batalhão", url: RAW_LINKS.hierarquia, icon: "🏛️" },
-            { id: "fardamentos", name: "Fardamentos do Batalhão", url: RAW_LINKS.fardamentos, icon: "🎽" },
-            { id: "doutrinas", name: "Doutrinas e Regimento Interno", url: RAW_LINKS.doutrinas, icon: "📜" },
-            { id: "secoes", name: "Seções Internas do Batalhão", url: RAW_LINKS.secoes, icon: "🗂️" },
-            { id: "crimes", name: "Crimes Militares", url: RAW_LINKS.crimes, icon: "⚖️" },
+            // Hierarquia com sandbox de leitura
+            { id: "hierarquia", name: "Hierarquia do Batalhão", url: RAW_LINKS.hierarquia, icon: "🏛️",
+              sandbox: "allow-scripts allow-same-origin allow-downloads" },
+            { id: "fardamentos", name: "Fardamentos do Batalhão", url: RAW_LINKS.fardamentos, icon: "🎽", sandbox: null },
+            { id: "doutrinas", name: "Doutrinas e Regimento Interno", url: RAW_LINKS.doutrinas, icon: "📜", sandbox: null },
+            { id: "secoes", name: "Seções Internas do Batalhão", url: RAW_LINKS.secoes, icon: "🗂️", sandbox: null },
+            { id: "crimes", name: "Crimes Militares", url: RAW_LINKS.crimes, icon: "⚖️", sandbox: null },
           ],
         },
       ],
@@ -129,7 +123,7 @@
           </nav>
 
           <div className="p-3 mt-auto text-[11px] text-slate-500">
-            <div>v0.5 — Painel Unificado</div>
+            <div>v0.6 — Painel Unificado</div>
           </div>
         </aside>
       );
@@ -146,20 +140,22 @@
       );
     }
 
-    function Frame({ url }) {
+    function Frame({ url, sandbox }) {
       const [loaded, setLoaded] = useState(false);
       const [blocked, setBlocked] = useState(false);
+
+      // Converte /preview para docs; mantém outras URLs
+      const resolvedUrl = useMemo(() => toEmbedUrl(url), [url]);
 
       useEffect(() => {
         setLoaded(false);
         setBlocked(false);
-      }, [url]);
+      }, [resolvedUrl]);
 
-      // Se após 5s não carregar, mostramos um aviso (muitos docs carregam antes).
       useEffect(() => {
         const t = setTimeout(() => { if (!loaded) setBlocked(true); }, 5000);
         return () => clearTimeout(t);
-      }, [loaded, url]);
+      }, [loaded, resolvedUrl]);
 
       return (
         <div className="relative h-[calc(100vh-120px)]">
@@ -177,8 +173,10 @@
           )}
           <iframe
             title="app-frame"
-            src={url}
+            src={resolvedUrl}
             className="w-full h-full rounded-xl border border-white/10 bg-slate-950"
+            referrerPolicy="no-referrer"
+            sandbox={sandbox || null}
             onLoad={() => setLoaded(true)}
           ></iframe>
         </div>
@@ -186,13 +184,9 @@
     }
 
     function App() {
-      // Mapeia rápida de id -> item e define o primeiro como ativo
       const flatItems = useMemo(() => CONFIG.sections.flatMap(s => s.items), []);
       const [active, setActive] = useState(flatItems[0]?.id || "");
-
-      // Resolve a URL final (faz /preview para docs/sheets)
       const activeItem = useMemo(() => flatItems.find(x => x.id === active), [active, flatItems]);
-      const resolvedUrl = useMemo(() => toEmbedUrl(activeItem?.url || ""), [activeItem]);
 
       return (
         <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -204,7 +198,7 @@
               onSelect={setActive}
             />
             <main className="flex-1">
-              <Frame url={resolvedUrl} />
+              <Frame url={activeItem?.url || ""} sandbox={activeItem?.sandbox || null} />
             </main>
           </div>
         </div>

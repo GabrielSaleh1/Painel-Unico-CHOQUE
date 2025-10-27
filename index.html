@@ -38,7 +38,7 @@
       hierarquiaPublicView: "https://gabrielsaleh1.github.io/Hierarquia",
       // Fonte de dados SOMENTE-LEITURA da hierarquia (JSON público hospedado no site original).
       // 👉 Ajuste a URL abaixo para o endpoint de dados real do seu projeto (ex.: /Hierarquia/data.json ou /api/hierarquia.json)
-      hierarquiaData: "https://gabrielsaleh1.github.io/Hierarquia/data.json",
+      hierarquiaData: "https://gabrielsaleh1.github.io/Hierarquia/policiais.json",
 
       // Documentos do Batalhão
       fardamentos: "docs.google.com/spreadsheets/u/1/d/15q-JK8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/edit?usp=sharing",
@@ -88,7 +88,13 @@
           })
           .then((json) => {
             if (cancel) return;
-            const arr = Array.isArray(json) ? json : (json?.pessoas || json?.members || []);
+            let arr = Array.isArray(json) ? json : (json?.pessoas || json?.members || []);
+            if (Array.isArray(arr)) {
+              // Ignora objetos de seção e normaliza id a partir do seu JSON
+              arr = arr
+                .filter(it => !(it && it.type === 'section'))
+                .map(it => ({ id: it?.id || it?.matricula || it?.nome || it?.name, ...it }));
+            }
             setPeople(Array.isArray(arr) ? arr : []);
             setLoading(false);
           })
@@ -139,19 +145,8 @@
           {loading ? (
             <div className="px-3 py-2 rounded-xl border border-white/10 bg-slate-900/60 text-sm text-slate-400">Carregando hierarquia…</div>
           ) : error ? (
-            <div className="space-y-3">
-              <div className="px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-sm">
-                {error}. Tentei carregar um JSON público em <code>{dataUrl}</code>.
-              </div>
-              <div className="rounded-xl border border-white/10 overflow-hidden">
-                <iframe
-                  title="hierarquia-fallback"
-                  src={RAW_LINKS.hierarquiaPublicView}
-                  className="w-full h-[60vh] bg-slate-950"
-                  referrerPolicy="no-referrer"
-                  sandbox={'allow-scripts allow-downloads'}
-                ></iframe>
-              </div>
+            <div className="px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-sm">
+              {error}. Não foi possível carregar o JSON público em <code>{dataUrl}</code>.
             </div>
           ) : active ? (
             <div className="grid md:grid-cols-3 gap-4">

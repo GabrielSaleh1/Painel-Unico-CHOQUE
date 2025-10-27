@@ -5,208 +5,348 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ROTA · Painel Único</title>
   <meta name="description" content="Painel único para unificar sistemas e documentos do Batalhão (GTA RP Polícia)" />
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class', theme: { extend: {} } }
-  </script>
+  <script>tailwind.config = { darkMode:'class', theme:{ extend:{} } }</script>
   <style>
     html, body, #root { height: 100%; }
-    body { background: #020617; } /* slate-950 */
+    body { background:#020617; }
+    .sidebar { width: 20rem; }
+    .kv { display:grid; grid-template-columns: 170px 1fr; gap:.5rem .75rem; }
+    .chip{display:inline-flex;align-items:center;gap:.5rem;padding:.15rem .55rem;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.2px;border:1px solid transparent}
+    .chip.green{background:rgba(34,197,94,.15);color:rgb(134,239,172);border-color:rgba(34,197,94,.3)}
+    .chip.red{background:rgba(239,68,68,.15);color:rgb(252,165,165);border-color:rgba(239,68,68,.3)}
+    .grad-head{position:sticky;top:0;z-index:5;background:rgba(2,6,23,.95);backdrop-filter:blur(6px);padding:.4rem .5rem;border-bottom:1px solid rgba(255,255,255,.1);color:#facc15;text-transform:uppercase;font-weight:700}
+    .list-item{padding:.55rem .65rem;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}
+    .list-item:hover{background:rgba(255,255,255,.04)}
+    .list-item.active{background:rgba(250,204,21,.08);border-left:3px solid #facc15}
+    .photo{width:104px;height:140px;border-radius:.75rem;background:#0b1220;border:1px solid rgba(255,255,255,.08);display:grid;place-items:center;color:#94a3b8;overflow:hidden}
+    .photo img{width:100%;height:100%;object-fit:cover;display:block}
+    @media (max-width: 1024px){ .layout{flex-direction:column} .sidebar{width:100%} }
   </style>
 </head>
-<body class="dark">
-  <div id="root"></div>
+<body class="dark text-slate-100">
+<div id="root"></div>
 
-  <!-- React + Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- React -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script>
+const {useEffect,useMemo,useState} = React;
 
-  <script type="text/babel">
-    const { useMemo, useState, useEffect } = React;
+/* ---------------- CONFIG ---------------- */
+const RAW_LINKS = {
+  ponto: "https://gabrielsaleh1.github.io/Ponto-Online",
+  rso: "https://gabrielsaleh1.github.io/RSO-Online",
+  // base do repositório de hierarquia
+  hierarquiaBase: "https://gabrielsaleh1.github.io/Hierarquia",
+  fardamentos: "https://docs.google.com/spreadsheets/u/1/d/15q-JK8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/preview",
+  doutrinas: "https://docs.google.com/document/d/1LwrV0gPkA0QCRinGGXtQF0bsaWri-rQZOdPiVmCPVus/preview",
+  secoes: "https://docs.google.com/spreadsheets/d/1Rw6o7O1rAjVC4XCDFwe6L0vInKSQsBvYZsWm6Rb1pfE/preview#gid=0",
+  crimes: "https://docs.google.com/document/d/1iGnC80f9COCirKVGHYm5Nr9xSr6hodYHCDl3IAXZvoY/preview",
+};
 
-    // ----------------- URLs E CONFIG -----------------
-    const RAW_LINKS = {
-      // Sistemas
-      ponto: "https://gabrielsaleh1.github.io/Ponto-Online",
-      rso: "https://gabrielsaleh1.github.io/RSO-Online",
+const SECTIONS = [
+  {
+    label: "Sistemas",
+    items: [
+      { id: "ponto", name: "Bate-Ponto", icon: "⏱️", type: "iframe", url: RAW_LINKS.ponto },
+      { id: "rso",   name: "RSO Online", icon: "📋", type: "iframe", url: RAW_LINKS.rso },
+    ],
+  },
+  {
+    label: "Documentos do Batalhão",
+    items: [
+      { id: "hierarquia", name: "Hierarquia do Batalhão", icon: "🏛️", type: "hierarquia" }, // inline só-leitura
+      { id: "fardamentos", name: "Fardamentos do Batalhão", icon: "🎽", type: "iframe", url: RAW_LINKS.fardamentos },
+      { id: "doutrinas", name: "Doutrinas e Regimento Interno", icon: "📜", type: "iframe", url: RAW_LINKS.doutrinas },
+      { id: "secoes", name: "Seções Internas do Batalhão", icon: "🗂️", type: "iframe", url: RAW_LINKS.secoes },
+      { id: "crimes", name: "Crimes Militares", icon: "⚖️", type: "iframe", url: RAW_LINKS.crimes },
+    ],
+  },
+];
 
-      // Hierarquia travada em leitura (parâmetro + sandbox)
-      hierarquia: "https://gabrielsaleh1.github.io/Hierarquia?view=1",
+/* ------------- HIERARQUIA (read-only) ------------- */
+const RANK_WEIGHT = {
+  "CEL PM":100, "TEN.CEL PM":90, "MAJ PM":80, "CAP PM":70,
+  "1º TEN PM":60, "2º TEN PM":50, "ASP OF PM":40,
+  "SUBTEN PM":35, "1º SGT PM":34, "2º SGT PM":33, "3º SGT PM":32,
+  "CB PM":20, "SD PM":10, "ALUNO":1
+};
+const GRAD_ORDER = [
+  { label:"Oficiais Superiores",    match: p => /(^CEL\b|TEN\.?CEL|MAJ)/i.test(p) },
+  { label:"Oficiais Intermediários",match: p => /\bCAP\b/i.test(p) },
+  { label:"Oficiais Subalternos",   match: p => /(1º\s*TEN|2º\s*TEN|ASP)/i.test(p) },
+  { label:"Praças Graduados",       match: p => /(SUBTEN|SGT|CB|SD)/i.test(p) },
+  { label:"Outros",                 match: p => true },
+];
+const rankVal = (p) => RANK_WEIGHT[p?.toUpperCase?.()] ?? 0;
+function patenteToGraduacao(p=""){
+  const up = String(p||"").toUpperCase();
+  return (GRAD_ORDER.find(g=>g.match(up))||GRAD_ORDER[GRAD_ORDER.length-1]).label;
+}
+const norm = s => String(s||"").normalize("NFD").replace(/\p{Diacritic}/gu,'').toLowerCase();
 
-      // Documentos do Batalhão
-      fardamentos: "docs.google.com/spreadsheets/u/1/d/15q-JK8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/edit?usp=sharing",
-      doutrinas: "https://docs.google.com/document/d/1LwrV0gPkA0QCRinGGXtQF0bsaWri-rQZOdPiVmCPVus/edit?usp=sharing",
-      secoes: "https://docs.google.com/spreadsheets/d/1Rw6o7O1rAjVC4XCDFwe6L0vInKSQsBvYZsWm6Rb1pfE/edit?gid=0#gid=0",
-      crimes: "https://docs.google.com/document/d/1iGnC80f9COCirKVGHYm5Nr9xSr6hodYHCDl3IAXZvoY/edit?tab=t.0",
-    };
+async function fetchText(url){
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error(r.statusText);
+  return await r.text();
+}
+async function fetchJSON(url){
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error(r.statusText);
+  return await r.json();
+}
+function parseCSV(txt){
+  const rows=[];let i=0,f='',row=[],q=false;
+  while(i<txt.length){const c=txt[i];
+    if(q){ if(c=='"'){ if(txt[i+1]=='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else{ if(c=='"') q=true; else if(c==','){ row.push(f); f=''; }
+      else if(c=='\n'||c=='\r'){ if(f.length||row.length){ row.push(f); rows.push(row); row=[]; f=''; } if(c=='\r'&&txt[i+1]=='\n') i++; }
+      else f+=c; }
+    i++;
+  }
+  if(f.length||row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
 
-    // Converte links do Google Docs/Sheets para /preview (melhor para iframe)
-    function toEmbedUrl(url) {
-      if (!url) return url;
-      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-      try {
-        const u = new URL(url);
-        if (u.hostname !== "docs.google.com") return url;
-        const parts = u.pathname.split("/").filter(Boolean);
-        const type = parts[0]; // "document" | "spreadsheets" | ...
-        const idIndex = parts.findIndex(p => p === "d");
-        const fileId = idIndex >= 0 ? parts[idIndex + 1] : null;
-        if (fileId) {
-          const frag = u.hash || "";
-          return `https://docs.google.com/${type}/d/${fileId}/preview${frag}`;
+async function loadPoliciais(base){
+  const tries = [
+    `${base}/policiais.json`,
+    `${base}/hierarquia.json`,
+    `${base}/data.json`,
+  ];
+  for (const url of tries){
+    try { const j = await fetchJSON(url); if(Array.isArray(j)) return j; } catch {}
+  }
+  // tenta CSV
+  try {
+    const txt = await fetchText(`${base}/policiais.csv`);
+    const [hdr,...lines] = parseCSV(txt);
+    const map = hdr.map(h=>h && norm(h));
+    const cols = ["matricula","nome","guerra","patente","funcao","edital","situacao","licenca_premium","ultima_promocao","turma","cia","data_entrada","padrinhos","pad","foto"];
+    return lines.filter(r=>r && r.some(x=>String(x||"").trim()))
+      .map(r=>{
+        const obj={};
+        cols.forEach(c=>{
+          const idx = map.indexOf(norm(c));
+          if(idx>=0) obj[c] = r[idx] || "";
+        });
+        // normaliza boolean
+        if(typeof obj.licenca_premium!=="boolean"){
+          const v = norm(obj.licenca_premium);
+          obj.licenca_premium = (v==='true'||v==='sim'||v==='ativa'||v==='ok'||v==='1');
         }
-      } catch(e) {}
-      return url;
-    }
+        return obj;
+      });
+  } catch {}
+  return null;
+}
 
-    // Itens da interface
-    const CONFIG = {
-      brand: { name: "ROTA · Painel Único", badge: "GTA RP" },
-      sections: [
-        {
-          label: "Sistemas",
-          items: [
-            { id: "ponto", name: "Bate-Ponto", url: RAW_LINKS.ponto, icon: "⏱️", sandbox: null },
-            { id: "rso", name: "RSO Online", url: RAW_LINKS.rso, icon: "📋", sandbox: null },
-          ],
-        },
-        {
-          label: "Documentos do Batalhão",
-          items: [
-            // Hierarquia com sandbox de leitura
-            { id: "hierarquia", name: "Hierarquia do Batalhão", url: RAW_LINKS.hierarquia, icon: "🏛️",
-              sandbox: "allow-scripts allow-same-origin allow-downloads" },
-            { id: "fardamentos", name: "Fardamentos do Batalhão", url: RAW_LINKS.fardamentos, icon: "🎽", sandbox: null },
-            { id: "doutrinas", name: "Doutrinas e Regimento Interno", url: RAW_LINKS.doutrinas, icon: "📜", sandbox: null },
-            { id: "secoes", name: "Seções Internas do Batalhão", url: RAW_LINKS.secoes, icon: "🗂️", sandbox: null },
-            { id: "crimes", name: "Crimes Militares", url: RAW_LINKS.crimes, icon: "⚖️", sandbox: null },
-          ],
-        },
-      ],
-    };
-
-    // ----------------- COMPONENTES -----------------
-    function Sidebar({ sections, activeId, onSelect }) {
-      return (
-        <aside className="w-80 shrink-0 border-r border-white/10 bg-slate-900/40 backdrop-blur">
-          <div className="p-4 border-b border-white/10">
-            <div className="text-xs uppercase tracking-widest text-slate-400">{CONFIG.brand.badge}</div>
-            <div className="font-black text-lg">{CONFIG.brand.name}</div>
+/* ----------------- UI ----------------- */
+function Sidebar({ sections, activeId, onSelect }) {
+  return (
+    <aside className="sidebar shrink-0 border-r border-white/10 bg-slate-900/40 backdrop-blur rounded-r-xl">
+      <div className="p-4 border-b border-white/10">
+        <div className="text-xs uppercase tracking-widest text-slate-400">GTA RP</div>
+        <div className="font-black text-lg">ROTA · Painel Único</div>
+      </div>
+      <nav className="p-2">
+        {sections.map(sec=>(
+          <div key={sec.label} className="mb-3">
+            <div className="px-2 py-1 text-xs uppercase tracking-widest text-slate-400">{sec.label}</div>
+            <div className="mt-1 space-y-1">
+              {sec.items.map(it=>(
+                <button key={it.id}
+                  className={`w-full text-left px-3 py-2 rounded-xl transition border flex items-center gap-2 ${
+                    activeId===it.id ? "bg-amber-500 text-slate-900 border-amber-400" : "border-white/10 hover:bg-white/5"
+                  }`}
+                  onClick={()=>onSelect(it.id)}>
+                  <span className="text-base">{it.icon}</span>
+                  <div className="font-semibold text-sm">{it.name}</div>
+                </button>
+              ))}
+            </div>
           </div>
+        ))}
+      </nav>
+      <div className="p-3 mt-auto text-[11px] text-slate-500">v0.7 — Painel Unificado</div>
+    </aside>
+  );
+}
 
-          <nav className="p-2">
-            {sections.map((sec) => (
-              <div key={sec.label} className="mb-3">
-                <div className="px-2 py-1 text-xs uppercase tracking-widest text-slate-400">{sec.label}</div>
-                <div className="mt-1 space-y-1">
-                  {sec.items.map((it) => (
-                    <button
-                      key={it.id}
-                      onClick={() => onSelect(it.id)}
-                      className={`w-full text-left px-3 py-2 rounded-xl transition border flex items-center gap-2 ${
-                        activeId === it.id
-                          ? "bg-amber-500 text-slate-900 border-amber-400"
-                          : "border-white/10 hover:bg-white/5"
-                      }`}
-                    >
-                      <span className="text-base">{it.icon}</span>
-                      <div>
-                        <div className="font-semibold text-sm">{it.name}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+function Topbar({ title }) {
+  return (
+    <header className="sticky top-0 z-10 bg-slate-950/70 backdrop-blur border-b border-white/10">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="h-9 w-9 rounded-lg grid place-items-center font-black border border-amber-500/40 bg-slate-900/60">R</div>
+        <div className="font-bold">{title}</div>
+      </div>
+    </header>
+  );
+}
+
+function Frame({ url }) {
+  const [loaded,setLoaded] = useState(false);
+  const [blocked,setBlocked] = useState(false);
+  useEffect(()=>{ setLoaded(false); setBlocked(false); const t=setTimeout(()=>!loaded&&setBlocked(true),5000); return ()=>clearTimeout(t); },[url,loaded]);
+  return (
+    <div className="relative h-[calc(100vh-120px)]">
+      {!loaded && <div className="absolute inset-0 grid place-items-center text-slate-400">
+        <div className="px-3 py-2 rounded-xl border border-white/10 bg-slate-900/60 text-sm">Carregando conteúdo…</div>
+      </div>}
+      {blocked && <div className="absolute top-3 right-3 px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-xs">
+        Caso o documento não permita incorporação, verifique permissões do Google.
+      </div>}
+      <iframe title="app-frame" src={url} className="w-full h-full rounded-xl border border-white/10 bg-slate-950" referrerpolicy="no-referrer" onload={()=>setLoaded(true)}></iframe>
+    </div>
+  );
+}
+
+/* ---------- Componente Hierarquia (só leitura) ---------- */
+function HierarquiaView(){
+  const [list,setList] = useState([]);
+  const [q,setQ] = useState("");
+  const [sel,setSel] = useState(-1);
+  const [err,setErr] = useState("");
+
+  useEffect(()=>{
+    (async ()=>{
+      setErr("");
+      const data = await loadPoliciais(RAW_LINKS.hierarquiaBase);
+      if(!data){ setErr("Não foi possível carregar a hierarquia. Coloque policiais.json (ou hierarquia.json / data.json / policiais.csv) no repositório /Hierarquia."); return; }
+      setList(data);
+      setSel(data.length?0:-1);
+    })();
+  },[]);
+
+  // filtro e agrupamento por graduação
+  const filtered = useMemo(()=>{
+    const n = norm(q);
+    return list.filter(r=>{
+      if(!q) return true;
+      return ["matricula","nome","guerra","patente","funcao","edital","situacao","turma","cia","padrinhos","pad"].some(k=>norm(r[k]).includes(n));
+    });
+  },[q,list]);
+
+  const groups = useMemo(()=>{
+    const gmap={};
+    filtered.forEach((r,i)=>{
+      const g = patenteToGraduacao(r.patente);
+      (gmap[g] ||= []).push({r,i});
+    });
+    // ordena grupos e cada grupo por peso de patente desc, nome asc
+    return GRAD_ORDER.map(g=>({
+      label: g.label,
+      items: (gmap[g.label]||[]).sort((a,b)=>{
+        const rw = rankVal(b.r.patente) - rankVal(a.r.patente);
+        if(rw) return rw;
+        return norm(a.r.nome) < norm(b.r.nome) ? -1 : 1;
+      })
+    })).filter(x=>x.items.length);
+  },[filtered]);
+
+  const p = (sel>=0 && filtered[sel]) ? filtered[sel] : null;
+
+  return (
+    <div className="h-[calc(100vh-120px)]">
+      <div className="mb-3 flex items-center gap-2">
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por nome, matrícula, patente..." className="w-80 px-3 py-2 rounded-lg border border-white/10 bg-slate-900/60" />
+        <button onClick={()=>window.print()} className="px-3 py-2 rounded-lg border border-white/10 hover:bg-white/5">Imprimir</button>
+        <div className="text-sm text-slate-400 ml-2">Somente leitura</div>
+      </div>
+
+      {err ? (
+        <div className="px-3 py-2 rounded-xl border border-rose-400/30 bg-rose-500/10 text-rose-200 text-sm">{err}</div>
+      ) : (
+        <div className="layout flex gap-4 h-full">
+          <aside className="rounded-2xl border border-white/10 bg-slate-900/40 shadow-xl overflow-auto" style={{height:'100%', width:'22rem'}}>
+            {groups.map(g=>(
+              <div key={g.label}>
+                <div className="grad-head">{g.label}</div>
+                {g.items.map(({r,i})=>{
+                  const isActive = filtered.indexOf(r)===sel;
+                  return (
+                    <div key={r.matricula||r.nome} className={`list-item ${isActive?'active':''}`} onClick={()=>setSel(filtered.indexOf(r))}>
+                      <div className="font-semibold">{r.nome||"-"} <span className="text-xs text-slate-400">({r.guerra||"-"})</span></div>
+                      <div className="text-xs text-slate-400">{r.matricula||"-"} • {r.patente||"-"}</div>
+                    </div>
+                  );
+                })}
               </div>
             ))}
-          </nav>
+            {!groups.length && <div className="text-slate-400 p-3">Nenhum registro encontrado.</div>}
+          </aside>
 
-          <div className="p-3 mt-auto text-[11px] text-slate-500">
-            <div>v0.6 — Painel Unificado</div>
-          </div>
-        </aside>
-      );
-    }
+          <main className="flex-1 rounded-2xl border border-white/10 bg-slate-900/40 shadow-xl overflow-auto p-5">
+            {!p ? (
+              <div className="text-slate-400">Selecione um policial na lista…</div>
+            ) : (
+              <>
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="photo">
+                    {p.foto ? <img src={p.foto} alt="Foto" /> : <div className="text-sm text-slate-400">Foto</div>}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-2xl font-extrabold">{p.nome||"-"} <span className="text-slate-400 text-lg">({p.guerra||"-"})</span></div>
+                    <div className="text-slate-300">{p.patente||"-"} • {patenteToGraduacao(p.patente)}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {p.licenca_premium ? <span className="chip green">Licença Premium ATIVA</span> : <span className="chip red">Licença Premium INATIVA</span>}
+                      {p.situacao ? <span className="chip" style="background:rgba(59,130,246,.18);color:#93c5fd;border-color:rgba(59,130,246,.35)">Situação: {p.situacao}</span> : null}
+                    </div>
+                  </div>
+                </div>
 
-    function Topbar({ title }) {
-      return (
-        <header className="sticky top-0 z-10 bg-slate-950/70 backdrop-blur border-b border-white/10">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg grid place-items-center font-black border border-amber-500/40 bg-slate-900/60">R</div>
-            <div className="font-bold">{title}</div>
-          </div>
-        </header>
-      );
-    }
-
-    function Frame({ url, sandbox }) {
-      const [loaded, setLoaded] = useState(false);
-      const [blocked, setBlocked] = useState(false);
-
-      // Converte /preview para docs; mantém outras URLs
-      const resolvedUrl = useMemo(() => toEmbedUrl(url), [url]);
-
-      useEffect(() => {
-        setLoaded(false);
-        setBlocked(false);
-      }, [resolvedUrl]);
-
-      useEffect(() => {
-        const t = setTimeout(() => { if (!loaded) setBlocked(true); }, 5000);
-        return () => clearTimeout(t);
-      }, [loaded, resolvedUrl]);
-
-      return (
-        <div className="relative h-[calc(100vh-120px)]">
-          {!loaded && (
-            <div className="absolute inset-0 grid place-items-center text-slate-400">
-              <div className="px-3 py-2 rounded-xl border border-white/10 bg-slate-900/60 text-sm">
-                Carregando conteúdo…
-              </div>
-            </div>
-          )}
-          {blocked && (
-            <div className="absolute top-3 right-3 px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-xs">
-              Caso o documento não permita incorporação, verifique permissões do Google.
-            </div>
-          )}
-          <iframe
-            title="app-frame"
-            src={resolvedUrl}
-            className="w-full h-full rounded-xl border border-white/10 bg-slate-950"
-            referrerPolicy="no-referrer"
-            sandbox={sandbox || null}
-            onLoad={() => setLoaded(true)}
-          ></iframe>
+                <div className="kv">
+                  <div className="text-slate-400">Matrícula</div><div>{p.matricula||"-"}</div>
+                  <div className="text-slate-400">Nome</div><div>{p.nome||"-"}</div>
+                  <div className="text-slate-400">Nome de Guerra</div><div>{p.guerra||"-"}</div>
+                  <div className="text-slate-400">Patente</div><div>{p.patente||"-"}</div>
+                  <div className="text-slate-400">Edital</div><div>{p.edital||"-"}</div>
+                  <div className="text-slate-400">Turma</div><div>{p.turma||"-"}</div>
+                  <div className="text-slate-400">CIA</div><div>{p.cia||"-"}</div>
+                  <div className="text-slate-400">Data de Entrada</div><div>{formatDate(p.data_entrada)}</div>
+                  <div className="text-slate-400">Última Promoção</div><div>{formatDate(p.ultima_promocao)}</div>
+                  <div className="text-slate-400">Função</div><div className="whitespace-pre-wrap leading-relaxed">{p.funcao||"-"}</div>
+                  <div className="text-slate-400">Padrinhos</div><div className="whitespace-pre-wrap leading-relaxed">{p.padrinhos||"-"}</div>
+                  <div className="text-slate-400">PAD</div><div>{p.pad||"-"}</div>
+                </div>
+              </>
+            )}
+          </main>
         </div>
-      );
-    }
+      )}
+    </div>
+  );
+}
 
-    function App() {
-      const flatItems = useMemo(() => CONFIG.sections.flatMap(s => s.items), []);
-      const [active, setActive] = useState(flatItems[0]?.id || "");
-      const activeItem = useMemo(() => flatItems.find(x => x.id === active), [active, flatItems]);
+function formatDate(v){
+  const s=String(v||"").trim(); if(!s) return "-";
+  const d=new Date(s); if(!isFinite(d)) return s;
+  const [y,m,dd]=d.toISOString().slice(0,10).split("-");
+  return `${dd}/${m}/${y}`;
+}
 
-      return (
-        <div className="min-h-screen bg-slate-950 text-slate-100">
-          <Topbar title={activeItem?.name || CONFIG.brand.name} />
-          <div className="max-w-7xl mx-auto p-4 flex gap-4">
-            <Sidebar
-              sections={CONFIG.sections}
-              activeId={active}
-              onSelect={setActive}
-            />
-            <main className="flex-1">
-              <Frame url={activeItem?.url || ""} sandbox={activeItem?.sandbox || null} />
-            </main>
-          </div>
-        </div>
-      );
-    }
+/* ---------------- APP ---------------- */
+function App(){
+  const flat = useMemo(()=>SECTIONS.flatMap(s=>s.items),[]);
+  const [active,setActive] = useState(flat[0].id);
+  const current = flat.find(x=>x.id===active);
 
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<App />);
-  </script>
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <Topbar title={current?.name || "ROTA · Painel Único"} />
+      <div className="max-w-7xl mx-auto p-4 flex gap-4 layout">
+        <Sidebar sections={SECTIONS} activeId={active} onSelect={setActive} />
+        <main className="flex-1">
+          {current?.type==="iframe" && <Frame url={current.url} />}
+          {current?.type==="hierarquia" && <HierarquiaView />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
 </body>
 </html>

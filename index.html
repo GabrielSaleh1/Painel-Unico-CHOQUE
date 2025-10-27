@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ROTA · Painel Único</title>
   <meta name="description" content="Painel único para unificar sistemas e documentos do Batalhão (GTA RP Polícia)" />
+  <!-- Segurança básica para impedir que este painel injete/edite algo em outros domínios -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://unpkg.com https://cdn.tailwindcss.com; frame-src https://docs.google.com https://gabrielsaleh1.github.io; connect-src 'self' https://gabrielsaleh1.github.io; img-src 'self' data:; style-src 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' https://unpkg.com 'unsafe-eval';">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -32,8 +34,11 @@
       ponto: "https://gabrielsaleh1.github.io/Ponto-Online",
       rso: "https://gabrielsaleh1.github.io/RSO-Online",
 
-      // Hierarquia travada em leitura (parâmetro + sandbox)
-      hierarquia: "https://gabrielsaleh1.github.io/Hierarquia?view=1",
+      // Hierarquia (somente visualização)
+      hierarquiaPublicView: "https://gabrielsaleh1.github.io/Hierarquia?view=1",
+      // Fonte de dados SOMENTE-LEITURA da hierarquia (JSON público hospedado no site original).
+      // 👉 Ajuste a URL abaixo para o endpoint de dados real do seu projeto (ex.: /Hierarquia/data.json ou /api/hierarquia.json)
+      hierarquiaData: "https://gabrielsaleh1.github.io/Hierarquia/data.json",
 
       // Documentos do Batalhão
       fardamentos: "docs.google.com/spreadsheets/u/1/d/15q-JK8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/edit?usp=sharing",
@@ -61,6 +66,119 @@
       return url;
     }
 
+    // ----------------- SOMENTE LEITURA: HIERARQUIA -----------------
+    // Este componente carrega dados públicos (GET) do site original e só permite visualizar.
+    // Nenhuma rota de escrita (POST/PUT/DELETE) é chamada aqui.
+    function HierarquiaViewer({ dataUrl }) {
+      const [people, setPeople] = useState([]);
+      const [query, setQuery] = useState("");
+      const [selectedId, setSelectedId] = useState(null);
+      const [error, setError] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        let cancel = false;
+        setLoading(true);
+        fetch(dataUrl, { method: 'GET', mode: 'cors', credentials: 'omit' })
+          .then(async (r) => {
+            if (!r.ok) throw new Error(`Falha ao carregar dados (${r.status})`);
+            return r.json();
+          })
+          .then((json) => {
+            if (cancel) return;
+            // Flexível: aceita dois formatos comuns
+            // 1) { pessoas: [ { id, nome, patente, setor, ... } ] }
+            // 2) [ { id, nome, patente, setor, ... } ]
+            const arr = Array.isArray(json) ? json : (json?.pessoas || json?.members || []);
+            setPeople(Array.isArray(arr) ? arr : []);
+            setLoading(false);
+          })
+          .catch((e) => { if (!cancel) { setError(e.message); setLoading(false); } });
+        return () => { cancel = true; };
+      }, [dataUrl]);
+
+      const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return people;
+        return people.filter(p => [p.nome, p.name, p.patente, p.rank, p.setor, p.sector, p.matricula, p.id]
+          .filter(Boolean)
+          .some(v => String(v).toLowerCase().includes(q)));
+      }, [people, query]);
+
+      const active = useMemo(() => {
+        if (!selectedId && filtered.length) return filtered[0];
+        return filtered.find(p => String(p.id) === String(selectedId));
+      }, [filtered, selectedId]);
+
+      return (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-white/10 p-3 bg-slate-900/40 backdrop-blur">
+            <div className="flex flex-col md:flex-row gap-3">
+              <input
+                type="text"
+                placeholder="Buscar por nome, patente, setor..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-lg bg-slate-950 border border-white/10 outline-none"
+              />
+              <select
+                className="md:w-80 px-3 py-2 rounded-lg bg-slate-950 border border-white/10"
+                value={selectedId || ''}
+                onChange={(e) => setSelectedId(e.target.value)}
+              >
+                {filtered.map(p => (
+                  <option key={p.id ?? p.nome} value={p.id ?? p.nome}>
+                    {(p.patente || p.rank ? `[${p.patente || p.rank}] ` : '')}{p.nome || p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {loading && (
+            <div className="px-3 py-2 rounded-xl border border-white/10 bg-slate-900/60 text-sm text-slate-400">Carregando hierarquia…</div>
+          )}
+          {error && (
+            <div className="px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-sm">{error}. Verifique a URL pública de dados.</div>
+          )}
+
+          {active && !loading && !error && (
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="md:col-span-1 rounded-xl border border-white/10 p-4 bg-slate-900/40">
+                <div className="text-xs uppercase tracking-widest text-slate-400">Selecionado</div>
+                <div className="text-lg font-bold">{active.nome || active.name}</div>
+                <div className="text-slate-300">{active.patente || active.rank || 'Sem patente'}</div>
+                {active.matricula && <div className="text-slate-400 text-sm">Matrícula: {active.matricula}</div>}
+                {active.setor && <div className="text-slate-400 text-sm">Setor: {active.setor}</div>}
+              </div>
+
+              <div className="md:col-span-2 rounded-xl border border-white/10 p-4 bg-slate-900/40 space-y-2">
+                <div className="text-xs uppercase tracking-widest text-slate-400">Informações</div>
+                <table className="w-full text-sm">
+                  <tbody className="[&_tr]:border-b [&_tr]:border-white/10">
+                    {Object.entries(active).map(([k, v]) => (
+                      <tr key={k}>
+                        <td className="py-2 pr-3 text-slate-400 whitespace-nowrap">{k}</td>
+                        <td className="py-2 text-slate-100 break-words">{String(v)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="text-xs text-slate-500">Somente leitura — alterações só podem ser feitas pelo site original.</div>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-xs p-3">
+            Dica: caso precise abrir a página oficial para confirmar dados, use o botão abaixo. Edição não é permitida a partir deste painel.
+            <div className="mt-2">
+              <a href={RAW_LINKS.hierarquiaPublicView} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border border-amber-400/40 hover:bg-amber-500/20">Abrir site oficial (view)</a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Itens da interface
     const CONFIG = {
       brand: { name: "ROTA · Painel Único", badge: "GTA RP" },
@@ -75,9 +193,8 @@
         {
           label: "Documentos do Batalhão",
           items: [
-            // Hierarquia com sandbox de leitura
-            { id: "hierarquia", name: "Hierarquia do Batalhão", url: RAW_LINKS.hierarquia, icon: "🏛️",
-              sandbox: "allow-scripts allow-same-origin allow-downloads" },
+            // Hierarquia agora é um VISUALIZADOR local somente-leitura (sem iframe editável)
+            { id: "hierarquia", name: "Hierarquia do Batalhão (Somente leitura)", type: 'hierarquia' , icon: "🏛️" },
             { id: "fardamentos", name: "Fardamentos do Batalhão", url: RAW_LINKS.fardamentos, icon: "🎽", sandbox: null },
             { id: "doutrinas", name: "Doutrinas e Regimento Interno", url: RAW_LINKS.doutrinas, icon: "📜", sandbox: null },
             { id: "secoes", name: "Seções Internas do Batalhão", url: RAW_LINKS.secoes, icon: "🗂️", sandbox: null },
@@ -123,7 +240,7 @@
           </nav>
 
           <div className="p-3 mt-auto text-[11px] text-slate-500">
-            <div>v0.6 — Painel Unificado</div>
+            <div>v0.7 — Painel Unificado (hierarquia somente leitura)</div>
           </div>
         </aside>
       );
@@ -157,6 +274,9 @@
         return () => clearTimeout(t);
       }, [loaded, resolvedUrl]);
 
+      // Sandbox mais restrito: sem same-origin e sem forms; impede scripts do iframe de mexerem fora dele
+      const iframeSandbox = sandbox ?? 'allow-scripts allow-downloads';
+
       return (
         <div className="relative h-[calc(100vh-120px)]">
           {!loaded && (
@@ -176,7 +296,7 @@
             src={resolvedUrl}
             className="w-full h-full rounded-xl border border-white/10 bg-slate-950"
             referrerPolicy="no-referrer"
-            sandbox={sandbox || null}
+            sandbox={iframeSandbox}
             onLoad={() => setLoaded(true)}
           ></iframe>
         </div>
@@ -198,7 +318,12 @@
               onSelect={setActive}
             />
             <main className="flex-1">
-              <Frame url={activeItem?.url || ""} sandbox={activeItem?.sandbox || null} />
+              {/* Renderização condicional: hierarquia vira viewer local somente-leitura */}
+              {activeItem?.type === 'hierarquia' ? (
+                <HierarquiaViewer dataUrl={RAW_LINKS.hierarquiaData} />
+              ) : (
+                <Frame url={activeItem?.url || ""} sandbox={activeItem?.sandbox || null} />
+              )}
             </main>
           </div>
         </div>

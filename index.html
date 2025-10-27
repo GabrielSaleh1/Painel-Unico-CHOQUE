@@ -35,7 +35,7 @@
       rso: "https://gabrielsaleh1.github.io/RSO-Online",
 
       // Hierarquia (somente visualização)
-      hierarquiaPublicView: "https://gabrielsaleh1.github.io/Hierarquia?view=1",
+      hierarquiaPublicView: "https://gabrielsaleh1.github.io/Hierarquia",
       // Fonte de dados SOMENTE-LEITURA da hierarquia (JSON público hospedado no site original).
       // 👉 Ajuste a URL abaixo para o endpoint de dados real do seu projeto (ex.: /Hierarquia/data.json ou /api/hierarquia.json)
       hierarquiaData: "https://gabrielsaleh1.github.io/Hierarquia/data.json",
@@ -139,7 +139,20 @@
             <div className="px-3 py-2 rounded-xl border border-white/10 bg-slate-900/60 text-sm text-slate-400">Carregando hierarquia…</div>
           )}
           {error && (
-            <div className="px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-sm">{error}. Verifique a URL pública de dados.</div>
+            <div className="space-y-3">
+              <div className="px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-sm">
+                {error}. Tentei carregar um JSON público em <code>{dataUrl}</code>.
+              </div>
+              <div className="rounded-xl border border-white/10 overflow-hidden">
+                <iframe
+                  title="hierarquia-fallback"
+                  src={RAW_LINKS.hierarquiaPublicView}
+                  className="w-full h-[60vh] bg-slate-950"
+                  referrerPolicy="no-referrer"
+                  sandbox={'allow-scripts allow-downloads'}
+                ></iframe>
+              </div>
+            </div>
           )}
 
           {active && !loading && !error && (
@@ -168,13 +181,7 @@
               </div>
             </div>
           )}
-
-          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-xs p-3">
-            Dica: caso precise abrir a página oficial para confirmar dados, use o botão abaixo. Edição não é permitida a partir deste painel.
-            <div className="mt-2">
-              <a href={RAW_LINKS.hierarquiaPublicView} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border border-amber-400/40 hover:bg-amber-500/20">Abrir site oficial (view)</a>
-            </div>
-          </div>
+        </div>
         </div>
       );
     }

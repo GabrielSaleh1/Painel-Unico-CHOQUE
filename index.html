@@ -1,77 +1,218 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painel Unificado — RP</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  darkMode: 'class',
-  theme: { extend: {} }
-};
-</script>
-<style>
-  body { background:#020617; color:#e2e8f0; font-family: 'Inter', sans-serif; }
-  .sidebar {
-    width: 260px; background: #0f172a; border-right: 1px solid rgba(255,255,255,.05);
-    position: fixed; top: 0; bottom: 0; left: 0;
-    display: flex; flex-direction: column; padding: 1rem;
-  }
-  .sidebar h1 { font-size: 1.25rem; font-weight: 800; margin-bottom: 1rem; }
-  .sidebar button {
-    text-align: left; padding: .6rem .8rem; margin-bottom: .25rem;
-    border-radius: .5rem; width: 100%; font-weight: 500;
-    background: transparent; transition: all .15s;
-  }
-  .sidebar button:hover { background: rgba(255,255,255,.05); }
-  .sidebar button.active { background: rgba(250,204,21,.12); color: #fde68a; border-left: 3px solid #facc15; }
-  main { margin-left: 260px; padding: 1.5rem; height: 100vh; overflow: hidden; }
-  iframe { width: 100%; height: 100%; border: none; border-radius: .75rem; background: #0a0f1c; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ROTA · Painel Único</title>
+  <meta name="description" content="Painel único para unificar sistemas e documentos do Batalhão (GTA RP Polícia)" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: {} } }
+  </script>
+  <style>
+    html, body, #root { height: 100%; }
+    body { background: #020617; } /* slate-950 */
+  </style>
 </head>
 <body class="dark">
+  <div id="root"></div>
 
-  <!-- Barra lateral -->
-  <aside class="sidebar">
-    <h1>🚔 Painel RP</h1>
-    <button class="tab-btn active" data-target="viewPonto">Bate-Ponto</button>
-    <button class="tab-btn" data-target="viewRSO">RSO Online</button>
-    <button class="tab-btn" data-target="viewHierarquia">Hierarquia</button>
-  </aside>
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Conteúdo principal -->
-  <main>
-    <!-- Bate-Ponto -->
-    <section id="viewPonto" class="tab-view">
-      <iframe src="https://gabrielsaleh1.github.io/Ponto-Online" title="Bate-Ponto"></iframe>
-    </section>
+  <script type="text/babel">
+    const { useMemo, useState, useEffect } = React;
 
-    <!-- RSO Online -->
-    <section id="viewRSO" class="tab-view hidden">
-      <iframe src="https://gabrielsaleh1.github.io/RSO-Online" title="RSO Online"></iframe>
-    </section>
+    // ----------------- URLs E CONFIG -----------------
+    const RAW_LINKS = {
+      // Sistemas
+      ponto: "https://gabrielsaleh1.github.io/Ponto-Online",
+      rso: "https://gabrielsaleh1.github.io/RSO-Online",
 
-    <!-- Hierarquia (somente leitura) -->
-    <section id="viewHierarquia" class="tab-view hidden">
-      <iframe src="https://gabrielsaleh1.github.io/Hierarquia" title="Hierarquia"></iframe>
-    </section>
-  </main>
+      // Documentos do Batalhão (agora Hierarquia em modo leitura)
+      hierarquia: "https://gabrielsaleh1.github.io/Hierarquia?view=1",
+      fardamentos: "docs.google.com/spreadsheets/u/1/d/15q-JK8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/edit?usp=sharing",
+      doutrinas: "https://docs.google.com/document/d/1LwrV0gPkA0QCRinGGXtQF0bsaWri-rQZOdPiVmCPVus/edit?usp=sharing",
+      secoes: "https://docs.google.com/spreadsheets/d/1Rw6o7O1rAjVC4XCDFwe6L0vInKSQsBvYZsWm6Rb1pfE/edit?gid=0#gid=0",
+      crimes: "https://docs.google.com/document/d/1iGnC80f9COCirKVGHYm5Nr9xSr6hodYHCDl3IAXZvoY/edit?tab=t.0",
+    };
 
-<script>
-const tabs = document.querySelectorAll('.tab-btn');
-const views = document.querySelectorAll('.tab-view');
+    // Converte links do Google Docs/Sheets para /preview (melhor para iframe)
+    function toEmbedUrl(url) {
+      if (!url) return url;
+      // adiciona https:// se faltou
+      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
 
-tabs.forEach(btn => {
-  btn.addEventListener('click', () => {
-    tabs.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    views.forEach(v => v.classList.add('hidden'));
-    const target = document.getElementById(btn.dataset.target);
-    target.classList.remove('hidden');
-  });
-});
-</script>
+      try {
+        const u = new URL(url);
+        // somente para docs.google.com
+        if (u.hostname !== "docs.google.com") return url;
 
+        // document ou spreadsheets
+        const parts = u.pathname.split("/").filter(Boolean); // ["document","d","<ID>", ...]
+        const type = parts[0]; // "document" | "spreadsheets" | ...
+        const idIndex = parts.findIndex(p => p === "d");
+        const fileId = idIndex >= 0 ? parts[idIndex + 1] : null;
+
+        if (fileId) {
+          // mantém fragmento (#gid=0) se houver
+          const frag = u.hash || "";
+          return `https://docs.google.com/${type}/d/${fileId}/preview${frag}`;
+        }
+      } catch(e) {
+        // se der erro, retorna original
+      }
+      return url;
+    }
+
+    const CONFIG = {
+      brand: { name: "ROTA · Painel Único", badge: "GTA RP" },
+
+      // Itens da sidebar em duas seções
+      sections: [
+        {
+          label: "Sistemas",
+          items: [
+            { id: "ponto", name: "Bate-Ponto", url: RAW_LINKS.ponto, icon: "⏱️" },
+            { id: "rso", name: "RSO Online", url: RAW_LINKS.rso, icon: "📋" },
+          ],
+        },
+        {
+          label: "Documentos do Batalhão",
+          items: [
+            { id: "hierarquia", name: "Hierarquia do Batalhão", url: RAW_LINKS.hierarquia, icon: "🏛️" },
+            { id: "fardamentos", name: "Fardamentos do Batalhão", url: RAW_LINKS.fardamentos, icon: "🎽" },
+            { id: "doutrinas", name: "Doutrinas e Regimento Interno", url: RAW_LINKS.doutrinas, icon: "📜" },
+            { id: "secoes", name: "Seções Internas do Batalhão", url: RAW_LINKS.secoes, icon: "🗂️" },
+            { id: "crimes", name: "Crimes Militares", url: RAW_LINKS.crimes, icon: "⚖️" },
+          ],
+        },
+      ],
+    };
+
+    // ----------------- COMPONENTES -----------------
+    function Sidebar({ sections, activeId, onSelect }) {
+      return (
+        <aside className="w-80 shrink-0 border-r border-white/10 bg-slate-900/40 backdrop-blur">
+          <div className="p-4 border-b border-white/10">
+            <div className="text-xs uppercase tracking-widest text-slate-400">{CONFIG.brand.badge}</div>
+            <div className="font-black text-lg">{CONFIG.brand.name}</div>
+          </div>
+
+          <nav className="p-2">
+            {sections.map((sec) => (
+              <div key={sec.label} className="mb-3">
+                <div className="px-2 py-1 text-xs uppercase tracking-widest text-slate-400">{sec.label}</div>
+                <div className="mt-1 space-y-1">
+                  {sec.items.map((it) => (
+                    <button
+                      key={it.id}
+                      onClick={() => onSelect(it.id)}
+                      className={`w-full text-left px-3 py-2 rounded-xl transition border flex items-center gap-2 ${
+                        activeId === it.id
+                          ? "bg-amber-500 text-slate-900 border-amber-400"
+                          : "border-white/10 hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="text-base">{it.icon}</span>
+                      <div>
+                        <div className="font-semibold text-sm">{it.name}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          <div className="p-3 mt-auto text-[11px] text-slate-500">
+            <div>v0.5 — Painel Unificado</div>
+          </div>
+        </aside>
+      );
+    }
+
+    function Topbar({ title }) {
+      return (
+        <header className="sticky top-0 z-10 bg-slate-950/70 backdrop-blur border-b border-white/10">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg grid place-items-center font-black border border-amber-500/40 bg-slate-900/60">R</div>
+            <div className="font-bold">{title}</div>
+          </div>
+        </header>
+      );
+    }
+
+    function Frame({ url }) {
+      const [loaded, setLoaded] = useState(false);
+      const [blocked, setBlocked] = useState(false);
+
+      useEffect(() => {
+        setLoaded(false);
+        setBlocked(false);
+      }, [url]);
+
+      // Se após 5s não carregar, mostramos um aviso (muitos docs carregam antes).
+      useEffect(() => {
+        const t = setTimeout(() => { if (!loaded) setBlocked(true); }, 5000);
+        return () => clearTimeout(t);
+      }, [loaded, url]);
+
+      return (
+        <div className="relative h-[calc(100vh-120px)]">
+          {!loaded && (
+            <div className="absolute inset-0 grid place-items-center text-slate-400">
+              <div className="px-3 py-2 rounded-xl border border-white/10 bg-slate-900/60 text-sm">
+                Carregando conteúdo…
+              </div>
+            </div>
+          )}
+          {blocked && (
+            <div className="absolute top-3 right-3 px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-xs">
+              Caso o documento não permita incorporação, verifique permissões do Google.
+            </div>
+          )}
+          <iframe
+            title="app-frame"
+            src={url}
+            className="w-full h-full rounded-xl border border-white/10 bg-slate-950"
+            onLoad={() => setLoaded(true)}
+          ></iframe>
+        </div>
+      );
+    }
+
+    function App() {
+      // Mapeia rápida de id -> item e define o primeiro como ativo
+      const flatItems = useMemo(() => CONFIG.sections.flatMap(s => s.items), []);
+      const [active, setActive] = useState(flatItems[0]?.id || "");
+
+      // Resolve a URL final (faz /preview para docs/sheets)
+      const activeItem = useMemo(() => flatItems.find(x => x.id === active), [active, flatItems]);
+      const resolvedUrl = useMemo(() => toEmbedUrl(activeItem?.url || ""), [activeItem]);
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100">
+          <Topbar title={activeItem?.name || CONFIG.brand.name} />
+          <div className="max-w-7xl mx-auto p-4 flex gap-4">
+            <Sidebar
+              sections={CONFIG.sections}
+              activeId={active}
+              onSelect={setActive}
+            />
+            <main className="flex-1">
+              <Frame url={resolvedUrl} />
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
 </body>
 </html>

@@ -5,17 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ROTA · Painel Único</title>
   <meta name="description" content="Painel único para unificar sistemas e documentos do Batalhão (GTA RP Polícia)" />
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = { darkMode: 'class', theme: { extend: {} } }
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['system-ui', 'ui-sans-serif', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            rota: {
+              gold: '#fbbf24',
+              dark: '#020617',
+            },
+          },
+          boxShadow: {
+            'glow-amber': '0 0 30px rgba(251, 191, 36, 0.25)',
+          },
+        },
+      },
+    }
   </script>
+
   <style>
     html, body, #root { height: 100%; }
-    body { background: #020617; } /* slate-950 */
+    body { background: #020617; }
   </style>
 </head>
-<body class="dark">
+<body class="dark antialiased">
   <div id="root"></div>
 
   <!-- React + Babel -->
@@ -63,25 +83,80 @@
 
     // Itens da interface
     const CONFIG = {
-      brand: { name: "ROTA · Painel Único", badge: "GTA RP" },
+      brand: { name: "ROTA · Painel Único", badge: "Batalhão ROTA · GTA RP" },
+      version: "v1.0 · Painel Unificado",
       sections: [
         {
-          label: "Sistemas",
+          label: "Sistemas Operacionais",
           items: [
-            { id: "ponto", name: "Bate-Ponto", url: RAW_LINKS.ponto, icon: "⏱️", sandbox: null },
-            { id: "rso", name: "RSO Online", url: RAW_LINKS.rso, icon: "📋", sandbox: null },
+            {
+              id: "ponto",
+              name: "Bate-Ponto",
+              url: RAW_LINKS.ponto,
+              icon: "⏱️",
+              desc: "Registro de início e fim de serviço dos militares.",
+              tag: "PRINCIPAL",
+              sandbox: null,
+            },
+            {
+              id: "rso",
+              name: "RSO Online",
+              url: RAW_LINKS.rso,
+              icon: "📋",
+              desc: "Registro de Serviços Operacionais.",
+              tag: "OCORRÊNCIAS",
+              sandbox: null,
+            },
           ],
         },
         {
           label: "Documentos do Batalhão",
           items: [
-            // Hierarquia com sandbox de leitura
-            { id: "hierarquia", name: "Hierarquia do Batalhão", url: RAW_LINKS.hierarquia, icon: "🏛️",
-              sandbox: "allow-scripts allow-same-origin allow-downloads" },
-            { id: "fardamentos", name: "Fardamentos do Batalhão", url: RAW_LINKS.fardamentos, icon: "🎽", sandbox: null },
-            { id: "doutrinas", name: "Doutrinas e Regimento Interno", url: RAW_LINKS.doutrinas, icon: "📜", sandbox: null },
-            { id: "secoes", name: "Seções Internas do Batalhão", url: RAW_LINKS.secoes, icon: "🗂️", sandbox: null },
-            { id: "crimes", name: "Crimes Militares", url: RAW_LINKS.crimes, icon: "⚖️", sandbox: null },
+            {
+              id: "hierarquia",
+              name: "Hierarquia do Batalhão",
+              url: RAW_LINKS.hierarquia,
+              icon: "🏛️",
+              desc: "Estrutura hierárquica completa da unidade.",
+              tag: "CONSULTA",
+              sandbox: "allow-scripts allow-same-origin allow-downloads",
+            },
+            {
+              id: "fardamentos",
+              name: "Fardamentos do Batalhão",
+              url: RAW_LINKS.fardamentos,
+              icon: "🎽",
+              desc: "Controle e padrão dos fardamentos.",
+              tag: "LOGÍSTICA",
+              sandbox: null,
+            },
+            {
+              id: "doutrinas",
+              name: "Doutrinas e Regimento Interno",
+              url: RAW_LINKS.doutrinas,
+              icon: "📜",
+              desc: "Normas, procedimentos e regras do batalhão.",
+              tag: "NORMAS",
+              sandbox: null,
+            },
+            {
+              id: "secoes",
+              name: "Seções Internas do Batalhão",
+              url: RAW_LINKS.secoes,
+              icon: "🗂️",
+              desc: "Organização das seções internas.",
+              tag: "ADMINISTRATIVO",
+              sandbox: null,
+            },
+            {
+              id: "crimes",
+              name: "Crimes Militares",
+              url: RAW_LINKS.crimes,
+              icon: "⚖️",
+              desc: "Tabela de crimes e enquadramentos.",
+              tag: "LEGISLAÇÃO",
+              sandbox: null,
+            },
           ],
         },
       ],
@@ -90,123 +165,7 @@
     // ----------------- COMPONENTES -----------------
     function Sidebar({ sections, activeId, onSelect }) {
       return (
-        <aside className="w-80 shrink-0 border-r border-white/10 bg-slate-900/40 backdrop-blur">
-          <div className="p-4 border-b border-white/10">
-            <div className="text-xs uppercase tracking-widest text-slate-400">{CONFIG.brand.badge}</div>
-            <div className="font-black text-lg">{CONFIG.brand.name}</div>
-          </div>
-
-          <nav className="p-2">
-            {sections.map((sec) => (
-              <div key={sec.label} className="mb-3">
-                <div className="px-2 py-1 text-xs uppercase tracking-widest text-slate-400">{sec.label}</div>
-                <div className="mt-1 space-y-1">
-                  {sec.items.map((it) => (
-                    <button
-                      key={it.id}
-                      onClick={() => onSelect(it.id)}
-                      className={`w-full text-left px-3 py-2 rounded-xl transition border flex items-center gap-2 ${
-                        activeId === it.id
-                          ? "bg-amber-500 text-slate-900 border-amber-400"
-                          : "border-white/10 hover:bg-white/5"
-                      }`}
-                    >
-                      <span className="text-base">{it.icon}</span>
-                      <div>
-                        <div className="font-semibold text-sm">{it.name}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          <div className="p-3 mt-auto text-[11px] text-slate-500">
-            <div>v0.6 — Painel Unificado</div>
-          </div>
-        </aside>
-      );
-    }
-
-    function Topbar({ title }) {
-      return (
-        <header className="sticky top-0 z-10 bg-slate-950/70 backdrop-blur border-b border-white/10">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg grid place-items-center font-black border border-amber-500/40 bg-slate-900/60">R</div>
-            <div className="font-bold">{title}</div>
-          </div>
-        </header>
-      );
-    }
-
-    function Frame({ url, sandbox }) {
-      const [loaded, setLoaded] = useState(false);
-      const [blocked, setBlocked] = useState(false);
-
-      // Converte /preview para docs; mantém outras URLs
-      const resolvedUrl = useMemo(() => toEmbedUrl(url), [url]);
-
-      useEffect(() => {
-        setLoaded(false);
-        setBlocked(false);
-      }, [resolvedUrl]);
-
-      useEffect(() => {
-        const t = setTimeout(() => { if (!loaded) setBlocked(true); }, 5000);
-        return () => clearTimeout(t);
-      }, [loaded, resolvedUrl]);
-
-      return (
-        <div className="relative h-[calc(100vh-120px)]">
-          {!loaded && (
-            <div className="absolute inset-0 grid place-items-center text-slate-400">
-              <div className="px-3 py-2 rounded-xl border border-white/10 bg-slate-900/60 text-sm">
-                Carregando conteúdo…
-              </div>
-            </div>
-          )}
-          {blocked && (
-            <div className="absolute top-3 right-3 px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-amber-200 text-xs">
-              Caso o documento não permita incorporação, verifique permissões do Google.
-            </div>
-          )}
-          <iframe
-            title="app-frame"
-            src={resolvedUrl}
-            className="w-full h-full rounded-xl border border-white/10 bg-slate-950"
-            referrerPolicy="no-referrer"
-            sandbox={sandbox || null}
-            onLoad={() => setLoaded(true)}
-          ></iframe>
-        </div>
-      );
-    }
-
-    function App() {
-      const flatItems = useMemo(() => CONFIG.sections.flatMap(s => s.items), []);
-      const [active, setActive] = useState(flatItems[0]?.id || "");
-      const activeItem = useMemo(() => flatItems.find(x => x.id === active), [active, flatItems]);
-
-      return (
-        <div className="min-h-screen bg-slate-950 text-slate-100">
-          <Topbar title={activeItem?.name || CONFIG.brand.name} />
-          <div className="max-w-7xl mx-auto p-4 flex gap-4">
-            <Sidebar
-              sections={CONFIG.sections}
-              activeId={active}
-              onSelect={setActive}
-            />
-            <main className="flex-1">
-              <Frame url={activeItem?.url || ""} sandbox={activeItem?.sandbox || null} />
-            </main>
-          </div>
-        </div>
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<App />);
-  </script>
-</body>
-</html>
+        <aside className="w-80 shrink-0 border-r border-white/10 bg-slate-950/80 backdrop-blur-xl rounded-3xl p-3 flex flex-col shadow-xl shadow-black/40">
+          {/* Cabeçalho da marca */}
+          <div className="px-3 py-3 mb-2 rounded-2xl bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-transparent border border-amber-400/40 shadow-glow-amber">
+            <div className="flex items-center gap-3">

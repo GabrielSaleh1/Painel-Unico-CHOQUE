@@ -2,51 +2,46 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8" />
+  <title>Painel Único - Batalhão ROTA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ROTA · Painel Único</title>
-  <meta name="description" content="Painel único para unificar sistemas e documentos do Batalhão (GTA RP Polícia)" />
-
-  <!-- Tailwind CSS -->
+  <!-- Tailwind via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['system-ui', 'ui-sans-serif', 'Inter', 'sans-serif'],
-          },
           colors: {
             rota: {
-              gold: '#fbbf24',
-              dark: '#020617',
+              bg: "#020617",
+              card: "rgba(15,23,42,0.95)",
+              accent: "#22c55e",
+              accentSoft: "rgba(34,197,94,0.20)",
+              accentStrong: "rgba(34,197,94,0.35)",
             },
           },
           boxShadow: {
-            'glow-amber': '0 0 30px rgba(251, 191, 36, 0.25)',
+            "inner-glow": "0 0 25px rgba(34,197,94,0.35)",
           },
         },
       },
-    }
+    };
   </script>
 
-  <style>
-    html, body, #root { height: 100%; }
-    body { background: #020617; }
-  </style>
+  <!-- React & ReactDOM via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Ícones -->
+  <link rel="icon" href="https://i.imgur.com/rA8xIGT.png" />
 </head>
-<body class="dark antialiased">
+<body class="bg-slate-950 min-h-screen text-slate-50 antialiased">
   <div id="root"></div>
 
-  <!-- React + Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
   <script type="text/babel">
-    const { useMemo, useState, useEffect } = React;
+    // ----------------- CONFIGURAÇÕES BÁSICAS -----------------
 
-    // ----------------- URLs E CONFIG -----------------
+    // Links "crus" (originais) para os sistemas e docs
     const RAW_LINKS = {
       // Sistemas
       ponto: "https://gabrielsaleh1.github.io/Ponto-Online",
@@ -56,10 +51,11 @@
       hierarquia: "https://gabrielsaleh1.github.io/Hierarquia?view=1",
 
       // Documentos do Batalhão
-      fardamentos: "docs.google.com/spreadsheets/u/1/d/15q-JK8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/edit?usp=sharing",
+      fardamentos: "docs.google.com/spreadsheets/u/1/d/15q-J8zUxIMMAAp_ssNFRrNsddTfGIJHVP241RUw3J4/edit?usp=sharing",
       doutrinas: "https://docs.google.com/document/d/1LPXXQl9Ux7o3iEy8zCpRePdtH_zCRyUnKS1Bkj_bLjE/edit?usp=sharing",
       secoes: "https://docs.google.com/spreadsheets/d/1Rw6o7O1rAjVC4XCDFwe6L0vInKSQsBvYZsWm6Rb1pfE/edit?gid=0#gid=0",
       crimes: "https://docs.google.com/document/d/1iGnC80f9COCirKVGHYm5Nr9xSr6hodYHCDl3IAXZvoY/edit?tab=t.0",
+      planilhaGeral: "https://docs.google.com/spreadsheets/d/1tNkMNbSzPn1qSgkKUlZQzOzJo6AwBd-STesfG_Sav6w/edit?usp=sharing",
     };
 
     // Converte links do Google Docs/Sheets para /preview (melhor para iframe)
@@ -72,166 +68,211 @@
         const parts = u.pathname.split("/").filter(Boolean);
         const type = parts[0]; // "document" | "spreadsheets" | ...
         const idIndex = parts.findIndex(p => p === "d");
-        const fileId = idIndex >= 0 ? parts[idIndex + 1] : null;
-        if (fileId) {
-          const frag = u.hash || "";
-          return `https://docs.google.com/${type}/d/${fileId}/preview${frag}`;
+        if (idIndex === -1 || !parts[idIndex + 1]) return url;
+        const fileId = parts[idIndex + 1];
+
+        let basePreviewPath = "";
+        if (type === "document") {
+          basePreviewPath = `/document/d/${fileId}/preview`;
+        } else if (type === "spreadsheets") {
+          basePreviewPath = `/spreadsheets/d/${fileId}/preview`;
+        } else {
+          // Se for outro tipo, deixa como está
+          return url;
         }
-      } catch(e) {}
-      return url;
+
+        const previewUrl = new URL(`https://docs.google.com${basePreviewPath}`);
+        // Mantém parâmetros relevantes (tipo gid, tab, etc)
+        u.searchParams.forEach((value, key) => {
+          previewUrl.searchParams.set(key, value);
+        });
+        return previewUrl.toString();
+      } catch (e) {
+        console.error("Erro ao transformar URL em preview:", e);
+        return url;
+      }
     }
 
-    // Itens da interface
-    const CONFIG = {
-      brand: { name: "ROTA · Painel Único", badge: "Batalhão ROTA · GTA RP" },
-      version: "v1.0 · Painel Unificado",
-      sections: [
-        {
-          label: "Sistemas Operacionais",
-          items: [
-            {
-              id: "ponto",
-              name: "Bate-Ponto",
-              url: RAW_LINKS.ponto,
-              icon: "⏱️",
-              desc: "Registro de início e fim de serviço dos militares.",
-              tag: "PRINCIPAL",
-              sandbox: null,
-            },
-            {
-              id: "rso",
-              name: "RSO Online",
-              url: RAW_LINKS.rso,
-              icon: "📋",
-              desc: "Registro de Serviços Operacionais.",
-              tag: "OCORRÊNCIAS",
-              sandbox: null,
-            },
-          ],
-        },
-        {
-          label: "Documentos do Batalhão",
-          items: [
-            {
-              id: "hierarquia",
-              name: "Hierarquia do Batalhão",
-              url: RAW_LINKS.hierarquia,
-              icon: "🏛️",
-              desc: "Estrutura hierárquica completa da unidade.",
-              tag: "CONSULTA",
-              sandbox: "allow-scripts allow-same-origin allow-downloads",
-            },
-            {
-              id: "fardamentos",
-              name: "Fardamentos do Batalhão",
-              url: RAW_LINKS.fardamentos,
-              icon: "🎽",
-              desc: "Controle e padrão dos fardamentos.",
-              tag: "LOGÍSTICA",
-              sandbox: null,
-            },
-            {
-              id: "doutrinas",
-              name: "Doutrinas e Regimento Interno",
-              url: RAW_LINKS.doutrinas,
-              icon: "📜",
-              desc: "Normas, procedimentos e regras do batalhão.",
-              tag: "NORMAS",
-              sandbox: null,
-            },
-            {
-              id: "secoes",
-              name: "Seções Internas do Batalhão",
-              url: RAW_LINKS.secoes,
-              icon: "🗂️",
-              desc: "Organização das seções internas.",
-              tag: "ADMINISTRATIVO",
-              sandbox: null,
-            },
-            {
-              id: "crimes",
-              name: "Crimes Militares",
-              url: RAW_LINKS.crimes,
-              icon: "⚖️",
-              desc: "Tabela de crimes e enquadramentos.",
-              tag: "LEGISLAÇÃO",
-              sandbox: null,
-            },
-          ],
-        },
-      ],
-    };
+    // ----------------- DADOS DAS SEÇÕES -----------------
+
+    const SECTIONS = [
+      {
+        label: "Sistemas Internos",
+        items: [
+          {
+            id: "ponto",
+            name: "Ponto Online",
+            url: RAW_LINKS.ponto,
+            icon: "⏱️",
+            desc: "Registro de ponto dos policiais.",
+            tag: "SISTEMA",
+            sandbox: "allow-scripts allow-same-origin",
+          },
+          {
+            id: "rso",
+            name: "RSO Online",
+            url: RAW_LINKS.rso,
+            icon: "📋",
+            desc: "Registro de Serviço Operacional.",
+            tag: "SISTEMA",
+            sandbox: "allow-scripts allow-same-origin",
+          },
+        ],
+      },
+      {
+        label: "Controle Operacional",
+        items: [
+          {
+            id: "hierarquia",
+            name: "Hierarquia do Batalhão",
+            url: RAW_LINKS.hierarquia,
+            icon: "🏛️",
+            desc: "Estrutura hierárquica completa da unidade.",
+            tag: "CONSULTA",
+            sandbox: "allow-scripts allow-same-origin allow-downloads",
+          },
+        ],
+      },
+      {
+        label: "Documentos do Batalhão",
+        items: [
+          {
+            id: "hierarquia_doc",
+            name: "Hierarquia (Documento)",
+            url: RAW_LINKS.hierarquia,
+            icon: "📑",
+            desc: "Documento oficial da hierarquia, em modo de visualização.",
+            tag: "DOC",
+            sandbox: "allow-scripts allow-same-origin",
+          },
+          {
+            id: "fardamentos",
+            name: "Fardamentos do Batalhão",
+            url: RAW_LINKS.fardamentos,
+            icon: "🎽",
+            desc: "Controle e padrão dos fardamentos.",
+            tag: "LOGÍSTICA",
+            sandbox: null,
+          },
+          {
+            id: "doutrinas",
+            name: "Doutrinas e Regimento Interno",
+            url: RAW_LINKS.doutrinas,
+            icon: "📜",
+            desc: "Normas, procedimentos e regras do batalhão.",
+            tag: "NORMAS",
+            sandbox: null,
+          },
+          {
+            id: "secoes",
+            name: "Seções Internas do Batalhão",
+            url: RAW_LINKS.secoes,
+            icon: "🗂️",
+            desc: "Organização das seções internas.",
+            tag: "ADMINISTRATIVO",
+            sandbox: null,
+          },
+          {
+            id: "crimes",
+            name: "Crimes Militares",
+            url: RAW_LINKS.crimes,
+            icon: "⚖️",
+            desc: "Tabela de crimes e enquadramentos.",
+            tag: "LEGISLAÇÃO",
+            sandbox: null,
+          },
+          {
+            id: "planilha_geral",
+            name: "Planilha Geral do Batalhão",
+            url: RAW_LINKS.planilhaGeral,
+            icon: "📊",
+            desc: "Planilha geral com informações consolidadas do batalhão.",
+            tag: "PLANILHA",
+            sandbox: null,
+          },
+        ],
+      },
+    ];
 
     // ----------------- COMPONENTES -----------------
     function Sidebar({ sections, activeId, onSelect }) {
       return (
-        <aside className="w-80 shrink-0 border-r border-white/10 bg-slate-950/80 backdrop-blur-xl rounded-3xl p-3 flex flex-col shadow-xl shadow-black/40">
+        <aside className="w-80 shrink-0 border-r border-white/10 bg-slate-950/60 backdrop-blur-xl p-4 flex flex-col gap-4">
           {/* Cabeçalho da marca */}
-          <div className="px-3 py-3 mb-2 rounded-2xl bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-transparent border border-amber-400/40 shadow-glow-amber">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl grid place-items-center bg-black/60 border border-amber-400 font-black text-lg tracking-tight">
-                R
-              </div>
-              <div className="flex-1">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-amber-200/80">
-                  {CONFIG.brand.badge}
-                </div>
-                <div className="font-extrabold text-sm leading-tight">
-                  {CONFIG.brand.name}
-                </div>
-              </div>
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300/80">
-              <span className="inline-flex items-center gap-1">
-                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Central operacional online</span>
-              </span>
-              <span className="text-slate-400">{CONFIG.version}</span>
+          <div className="flex items-center gap-3 mb-2">
+            <img
+              src="https://i.imgur.com/rA8xIGT.png"
+              alt="ROTA"
+              className="w-10 h-10 rounded-xl shadow-inner shadow-black/60"
+            />
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-400/80">
+                Batalhão ROTA
+              </p>
+              <h1 className="font-semibold text-sm text-slate-50">
+                Painel Único Operacional
+              </h1>
             </div>
           </div>
 
-          {/* Navegação */}
-          <nav className="mt-1 flex-1 overflow-y-auto pr-1 space-y-4">
-            {sections.map((sec) => (
-              <div key={sec.label}>
-                <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">
-                  {sec.label}
-                </div>
-                <div className="space-y-1.5">
-                  {sec.items.map((it) => {
-                    const isActive = activeId === it.id;
+          <div className="text-[11px] leading-4 text-slate-400 bg-slate-950/60 border border-white/5 rounded-2xl px-3 py-2">
+            Centralizamos aqui os principais sistemas e documentos da unidade.
+            Selecione um item para abrir na direita. Use{" "}
+            <span className="text-emerald-400 font-semibold">“Abrir em nova aba”</span>{" "}
+            para telas dedicadas.
+          </div>
+
+          <nav className="flex-1 overflow-y-auto pr-1 space-y-4">
+            {sections.map((section) => (
+              <div key={section.label} className="space-y-1">
+                <h2 className="text-[11px] uppercase tracking-[0.18em] text-slate-500 px-2">
+                  {section.label}
+                </h2>
+                <div className="mt-1 space-y-1.5">
+                  {section.items.map((item) => {
+                    const isActive = item.id === activeId;
                     return (
                       <button
-                        key={it.id}
-                        onClick={() => onSelect(it.id)}
+                        key={item.id}
+                        onClick={() => onSelect(item)}
                         className={[
-                          "group w-full text-left px-3.5 py-2.5 rounded-2xl border flex items-start gap-3 transition-all duration-200",
-                          "hover:-translate-y-[1px]",
-                          isActive
-                            ? "border-amber-400/80 bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent shadow-glow-amber"
-                            : "border-white/10 bg-slate-900/60 hover:bg-slate-800/80 hover:border-amber-400/40"
-                        ].join(" ")}
+                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-all",
+                          "border border-transparent hover:border-emerald-500/40",
+                          "bg-slate-900/60 hover:bg-slate-900/90",
+                          "group",
+                          isActive &&
+                            "border-emerald-500/70 shadow-inner-glow bg-slate-900/95",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
-                        <div className="mt-0.5 text-lg">
-                          <span className="drop-shadow">{it.icon}</span>
+                        <div className="flex items-center justify-center w-7 h-7 text-lg">
+                          <span className="drop-shadow-[0_0_12px_rgba(34,197,94,0.35)]">
+                            {item.icon}
+                          </span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className="font-semibold text-sm truncate">
-                              {it.name}
-                            </div>
-                            <span className={[
-                              "inline-flex items-center rounded-full px-2 py-[2px] text-[10px] border",
-                              isActive
-                                ? "border-amber-300/60 bg-amber-500/15 text-amber-100"
-                                : "border-slate-600 bg-slate-900/80 text-slate-200/80 group-hover:border-amber-300/60 group-hover:text-amber-100"
-                            ].join(" ")}
-                            >
-                              {it.tag}
-                            </span>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-slate-50 leading-tight">
+                              {item.name}
+                            </p>
+                            {item.tag && (
+                              <span
+                                className={[
+                                  "text-[9px] px-1.5 py-0.5 rounded-full border border-emerald-400/30",
+                                  "bg-emerald-400/10 text-emerald-300",
+                                  "uppercase tracking-[0.14em] font-semibold",
+                                ].join(" ")}
+                              >
+                                {item.tag}
+                              </span>
+                            )}
                           </div>
-                          <p className="mt-0.5 text-[11px] text-slate-400 line-clamp-2">
-                            {it.desc}
+                          <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">
+                            {item.desc}
+                          </p>
+                          <p className="text-[10px] text-emerald-400/90 mt-1 font-mono truncate">
+                            {item.url}
                           </p>
                         </div>
                       </button>
@@ -242,191 +283,135 @@
             ))}
           </nav>
 
-          {/* Rodapé */}
-          <div className="mt-3 pt-2 border-t border-white/5 text-[11px] text-slate-500 flex items-center justify-between px-2">
-            <span>
-              Desenvolvido para <span className="font-semibold text-slate-300">Batalhão ROTA</span>
+          <footer className="text-[10px] text-slate-500 mt-2 px-2">
+            Painel desenvolvido para facilitar o acesso rápido aos sistemas da
+            unidade.{" "}
+            <span className="text-slate-400">
+              Ajuste de links pode ser feito diretamente no arquivo{" "}
+              <span className="font-mono text-[10px] text-emerald-400">
+                RAW_LINKS
+              </span>
+              .
             </span>
-          </div>
+          </footer>
         </aside>
       );
     }
 
-    function Topbar({ title }) {
-      return (
-        <header className="sticky top-0 z-20 mb-4">
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-r from-slate-950/90 via-slate-900/80 to-slate-950/90 backdrop-blur-xl px-5 py-3 flex items-center justify-between shadow-xl shadow-black/40">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.3em] text-slate-400">
-                Painel de Controle
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <h1 className="font-bold text-lg tracking-tight">
-                  {title}
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-slate-300">
-              <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-2xl border border-white/10 bg-slate-900/70">
-                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1" />
-                <span>Servidor ativo</span>
-              </div>
-              <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-2xl border border-white/10 bg-slate-900/70">
-                <kbd className="px-1.5 py-0.5 rounded border border-white/15 text-[10px] bg-black/60">
-                  CTRL
-                </kbd>
-                <span>+</span>
-                <kbd className="px-1.5 py-0.5 rounded border border-white/15 text-[10px] bg-black/60">
-                  D
-                </kbd>
-                <span className="hidden sm:inline">· Favoritar no navegador</span>
-              </div>
-            </div>
-          </div>
-        </header>
-      );
-    }
-
-    function Frame({ item }) {
-      const [loaded, setLoaded] = useState(false);
-      const [blocked, setBlocked] = useState(false);
-
-      const resolvedUrl = useMemo(() => toEmbedUrl(item?.url || ""), [item]);
-
-      useEffect(() => {
-        setLoaded(false);
-        setBlocked(false);
-      }, [resolvedUrl]);
-
-      useEffect(() => {
-        const t = setTimeout(() => { if (!loaded) setBlocked(true); }, 5000);
-        return () => clearTimeout(t);
-      }, [loaded, resolvedUrl]);
-
-      if (!item) {
+    function MainPanel({ activeItem }) {
+      if (!activeItem) {
         return (
-          <div className="h-[calc(100vh-160px)] rounded-3xl border border-dashed border-white/15 bg-slate-950/80 grid place-items-center text-slate-400">
-            Selecione um sistema ou documento na lateral esquerda.
-          </div>
+          <main className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950 to-emerald-950/40">
+            <div className="max-w-md text-center px-6 py-8 rounded-3xl bg-slate-950/70 border border-white/5 shadow-xl shadow-black/40">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 mb-4 shadow-inner-glow">
+                <span className="text-2xl drop-shadow-[0_0_18px_rgba(34,197,94,0.6)]">
+                  🛡️
+                </span>
+              </div>
+              <h2 className="text-lg font-semibold text-slate-50 mb-2">
+                Selecione um sistema ou documento
+              </h2>
+              <p className="text-sm text-slate-400 mb-4">
+                Use o menu à esquerda para escolher o que deseja visualizar. O
+                conteúdo será aberto aqui, dentro do painel.
+              </p>
+              <ul className="text-xs text-slate-400 space-y-1 text-left inline-block">
+                <li>• Sistemas de ponto e RSO</li>
+                <li>• Hierarquia, doutrinas e seções</li>
+                <li>• Planilhas e documentos do batalhão</li>
+              </ul>
+            </div>
+          </main>
         );
       }
 
+      const embedUrl = toEmbedUrl(activeItem.url);
+
       return (
-        <div className="space-y-3">
-          {/* Barra de info do item selecionado */}
-          <div className="rounded-2xl border border-white/10 bg-slate-950/80 backdrop-blur-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-black/40">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-2xl grid place-items-center bg-slate-900 border border-amber-400/40 text-lg">
-                {item.icon}
+        <main className="flex-1 flex flex-col bg-slate-950/80">
+          {/* Top bar */}
+          <div className="border-b border-white/10 bg-slate-950/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center shadow-inner-glow">
+                <span className="text-xl drop-shadow-[0_0_16px_rgba(34,197,94,0.7)]">
+                  {activeItem.icon}
+                </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-sm">{item.name}</h2>
-                  <span className="px2 py-0.5 text-[10px] rounded-full border border-slate-600 text-slate-300 bg-slate-900/80">
-                    {item.tag}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5 max-w-xl">
-                  {item.desc}
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-slate-50 truncate">
+                  {activeItem.name}
+                </h2>
+                <p className="text-[11px] text-slate-400 truncate">
+                  {activeItem.desc}
                 </p>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => window.open(item.url, "_blank", "noopener,noreferrer")}
-                className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/70 bg-gradient-to-r from-amber-500/80 to-amber-400 text-slate-900 text-xs font-semibold px-3 py-1.5 shadow-glow-amber hover:brightness-110 transition"
+            <div className="flex items-center gap-3">
+              <a
+                href={
+                  /^https?:\/\//i.test(activeItem.url)
+                    ? activeItem.url
+                    : "https://" + activeItem.url
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-xs font-medium border border-emerald-400/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 shadow-inner-glow transition"
               >
-                <span>🔗</span>
                 <span>Abrir em nova aba</span>
-              </button>
+                <span className="text-[13px]">↗</span>
+              </a>
             </div>
           </div>
 
-          {/* Área do iframe */}
-          <div className="relative h-[calc(100vh-220px)] rounded-3xl border border-white/10 bg-slate-950/90 overflow-hidden shadow-2xl shadow-black/50">
-            {/* Estado de carregamento */}
-            {!loaded && (
-              <div className="absolute inset-0 grid place-items-center z-10">
-                <div className="px-4 py-3 rounded-2xl border border-white/10 bg-slate-900/90 text-sm text-slate-300 flex flex-col items-center gap-2">
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-                    <span>Carregando conteúdo...</span>
-                  </div>
-                  <div className="flex gap-1 text-[10px] text-slate-500">
-                    <span>Dica:</span>
-                    <span>se demorar muito, use o botão “Abrir em nova aba”.</span>
-                  </div>
-                </div>
+          {/* Iframe */}
+          <div className="flex-1 bg-slate-950 relative">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.35),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(15,23,42,1),_transparent_55%)] opacity-60 pointer-events-none" />
+            <div className="relative z-10 w-full h-full p-4 sm:p-5">
+              <div className="w-full h-full rounded-3xl border border-white/10 bg-black/70 overflow-hidden shadow-2xl shadow-black/50">
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  title={activeItem.name}
+                  className="w-full h-full bg-slate-950"
+                  loading="lazy"
+                  sandbox={
+                    activeItem.sandbox ||
+                    "allow-forms allow-scripts allow-same-origin allow-popups"
+                  }
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               </div>
-            )}
-
-            {/* Aviso de bloqueio */}
-            {blocked && (
-              <div className="absolute top-3 right-3 z-20 px-3 py-2 rounded-2xl border border-amber-400/40 bg-amber-500/15 text-amber-100 text-[11px] max-w-xs">
-                Este documento pode não permitir incorporação. Verifique as permissões no Google ou use o botão
-                <span className="font-semibold"> “Abrir em nova aba”</span>.
-              </div>
-            )}
-
-            <iframe
-              title={item.name}
-              src={resolvedUrl}
-              className="w-full h-full border-0"
-              referrerPolicy="no-referrer"
-              sandbox={item.sandbox || null}
-              onLoad={() => setLoaded(true)}
-            ></iframe>
+            </div>
           </div>
-        </div>
+        </main>
       );
     }
 
     function App() {
-      const flatItems = useMemo(() => CONFIG.sections.flatMap(s => s.items), []);
-      const [active, setActive] = useState(() => {
-        // Lê último item usado, se existir
-        const stored = typeof window !== "undefined" ? window.localStorage.getItem("rota-active-item") : null;
-        return stored || (flatItems[0]?.id || "");
+      const [activeItem, setActiveItem] = React.useState(() => {
+        // Padrão: abre o Ponto Online
+        return SECTIONS[0]?.items?.[0] || null;
       });
 
-      const activeItem = useMemo(
-        () => flatItems.find(x => x.id === active),
-        [active, flatItems]
-      );
-
-      useEffect(() => {
-        if (active) {
-          window.localStorage.setItem("rota-active-item", active);
-        }
-      }, [active]);
-
       return (
-        <div className="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-          <div className="absolute inset-0 -z-10 pointer-events-none opacity-60">
-            <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
-            <div className="absolute bottom-0 left-10 h-64 w-64 rounded-full bg-sky-500/5 blur-3xl" />
+        <div className="min-h-screen bg-slate-950 text-slate-50 flex">
+          <div className="fixed inset-0 pointer-events-none opacity-50">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.25),_transparent_60%),radial-gradient(circle_at_bottom,_rgba(15,23,42,1),_transparent_60%)]" />
           </div>
 
-          <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-            <Topbar title={activeItem?.name || CONFIG.brand.name} />
-            <div className="flex gap-4 sm:gap-5 items-stretch">
-              <Sidebar
-                sections={CONFIG.sections}
-                activeId={active}
-                onSelect={setActive}
-              />
-              <main className="flex-1">
-                <Frame item={activeItem} />
-              </main>
-            </div>
+          <div className="relative z-10 flex flex-1 max-w-7xl mx-auto w-full">
+            <Sidebar
+              sections={SECTIONS}
+              activeId={activeItem?.id}
+              onSelect={setActiveItem}
+            />
+            <MainPanel activeItem={activeItem} />
           </div>
         </div>
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   </script>
 </body>
 </html>
